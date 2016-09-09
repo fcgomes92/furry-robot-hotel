@@ -3,9 +3,9 @@ from rest_framework.permissions import BasePermission
 from rest_framework import HTTP_HEADER_ENCODING, exceptions
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
-from django.utils.translation import ugettext_lazy as _
 from logging import getLogger
 from hotel_example import models
+from hotel_example.strings import authentication as strings
 from passlib.hash import pbkdf2_sha256
 import base64
 import binascii
@@ -62,7 +62,8 @@ class IsAuthenticated(BasePermission):
 class PasswordAuthentication(BaseAuthentication):
     www_authenticate_realm = 'api'
 
-    def authenticate_credentials(self, email, password):
+    @staticmethod
+    def authenticate_credentials(email, password):
         credentials = {
             'username': email,
             'password': password
@@ -72,13 +73,11 @@ class PasswordAuthentication(BaseAuthentication):
 
         if user is None:
             raise exceptions.AuthenticationFailed(
-                _('Invalid username/password.'))
-
+                strings.INVALID_USERNAME_PASSWORD)
         if not user.is_active:
-            raise exceptions.AuthenticationFailed(
-                _('User inactive or deleted.'))
+            raise exceptions.AuthenticationFailed(strings.USER_NOT_ACTIVE)
 
-        return (user, None)
+        return user, None
 
     def authenticate_header(self, request):
         return 'Basic realm="%s"' % self.www_authenticate_realm
@@ -90,20 +89,15 @@ class PasswordAuthentication(BaseAuthentication):
             return None
 
         if len(auth) == 1:
-            msg = _('Invalid basic header. No credentials provided.')
-            raise exceptions.AuthenticationFailed(msg)
+            raise exceptions.AuthenticationFailed(strings.INVALID_HEADER)
         elif len(auth) > 2:
-            msg = _(
-                'Invalid basic header. Credentials string should not contain spaces.')
-            raise exceptions.AuthenticationFailed(msg)
+            raise exceptions.AuthenticationFailed(strings.INVALID_HEADER_SPACES)
 
         try:
             auth_parts = base64.b64decode(auth[1]).decode(
                 HTTP_HEADER_ENCODING).partition(':')
         except (TypeError, UnicodeDecodeError, binascii.Error):
-            msg = _(
-                'Invalid basic header. Credentials not correctly base64 encoded.')
-            raise exceptions.AuthenticationFailed(msg)
+            raise exceptions.AuthenticationFailed(strings.INVALID_HEADER_ENCODE)
 
         email, password = auth_parts[0], auth_parts[2]
         return self.authenticate_credentials(email, password)
@@ -116,35 +110,23 @@ class TokenAuthentication(BaseAuthentication):
         auth = get_authorization_header(request).split()
 
         if not auth or auth[0].lower() != self.keyword.lower().encode():
-            msg = 'Invalid token header.'
-            logger.error(msg=msg)
-            raise exceptions.AuthenticationFailed(msg)
+            raise exceptions.AuthenticationFailed(strings.INVALID_TOKEN_HEADER)
 
         if len(auth) == 1:
-            msg = 'Invalid token header. No credentials provided.'
-            logger.error(msg=msg)
-            raise exceptions.AuthenticationFailed(msg)
+            raise exceptions.AuthenticationFailed(strings.INVALID_TOKEN)
         elif len(auth) > 2:
-            msg = 'Invalid token header. Token string should not contain spaces.'
-            logger.error(msg=msg)
-            raise exceptions.AuthenticationFailed(msg)
+            raise exceptions.AuthenticationFailed(strings.INVALID_TOKEN_SPACES)
 
         try:
             token = auth[1].decode()
         except UnicodeError:
-            msg = 'Invalid token header. Token string should not contain invalid characters.'
-            logger.error(msg=msg)
-            raise exceptions.AuthenticationFailed(msg)
+            raise exceptions.AuthenticationFailed(strings.INVALID_TOKEN_CHARS)
 
         user = authenticate_token(token)
 
         if not user:
-            msg = 'Invalid token.'
-            logger.error(msg=msg)
-            raise exceptions.AuthenticationFailed(msg)
+            raise exceptions.AuthenticationFailed(strings.INVALID_TOKEN)
 
         if not user.is_active:
-            msg = 'User inactive or deleted.'
-            logger.error(msg=msg)
-            raise exceptions.AuthenticationFailed(msg)
+            raise exceptions.AuthenticationFailed(strings.USER_NOT_ACTIVE)
         return user, token

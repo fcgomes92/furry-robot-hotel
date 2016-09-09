@@ -4,6 +4,31 @@ from hotel_example import models, serializers, authentication
 from hotel_example.renderer import JSONResponse
 
 
+class LoginAPIView(APIView):
+    http_methods = ['post', ]
+    content_type = 'application/json'
+
+    authentication_classes = (authentication.PasswordAuthentication,)
+    permission_classes = (authentication.IsAuthenticated,)
+
+    def post(self, request, *args, **kwargs):
+        request.user.refresh_token()
+        serializer = serializers.UserSerializer(request.user)
+        return JSONResponse.http_json_response(serializer.data)
+
+
+class RefreshTokenAPIView(APIView):
+    http_methods = ['post', ]
+    content_type = 'application/json'
+
+    authentication_classes = (authentication.PasswordAuthentication,)
+    permission_classes = (authentication.IsAuthenticated,)
+
+    def post(self, request, *args, **kwargs):
+        token = request.user.refresh_token()
+        return JSONResponse.http_json_response({'token': token})
+
+
 class UsersAPIView(APIView):
     http_methods = ['get', 'post', 'delete', ]
     content_type = 'application/json'
